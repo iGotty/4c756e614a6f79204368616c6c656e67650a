@@ -19,6 +19,9 @@ import { Shield, Zap, Heart, ArrowRight, Sparkles } from 'lucide-react';
 // Services
 import { matchingAPI, interactionAPI, healthCheck } from './services/api';
 
+// Logo
+import LogoWhite from './assets/images/logo/lunajoy-logo-white.png';
+
 // Counter Animation Component
 function AnimatedCounter({ end, duration = 2000, prefix = '', suffix = '' }) {
   const [count, setCount] = useState(0);
@@ -456,11 +459,12 @@ function AppContent() {
         <div className="max-w-7xl mx-auto px-4">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
             <div>
-              <div className="flex items-center space-x-2 mb-4">
-                <div className="w-10 h-10 bg-yellow-500 rounded-full flex items-center justify-center">
-                  <span className="text-xl">🌙</span>
-                </div>
-                <span className="text-xl font-bold">LunaJoy</span>
+              <div className="mb-4">
+                <img
+                  src={LogoWhite}
+                  alt="LunaJoy"
+                  className="h-10 w-auto"
+                />
               </div>
               <p className="text-gray-400 text-sm">Your journey to wellness starts here.</p>
             </div>
