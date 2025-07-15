@@ -15,7 +15,7 @@ def health_check():
     """
     return {
         "status": "healthy",
-        "service": "LunaJoy Matching Engine",
+        "service": "LunaJoy Matching Engine!",
         "timestamp": datetime.utcnow().isoformat(),
         "version": "1.0.0",
         "data_loaded": {

@@ -34,7 +34,7 @@ jobs:
       run: npm run build
       env:
         CI: false
-        REACT_APP_API_URL: https://4c756e614a6f79204368616c6c656e67650a.azurewebsites.net
+        REACT_APP_API_URL: https://lunajoy-backend-api.azurewebsites.net
 
     - name: Copy web.config for Azure
       run: |
