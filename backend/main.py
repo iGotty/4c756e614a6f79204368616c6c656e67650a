@@ -6,6 +6,9 @@ from fastapi.middleware.cors import CORSMiddleware
 import os
 import sys
 
+# DEBUG: Forzar rebuild - 2025-07-15
+print("🚀 Iniciando LunaJoy App Service...")
+
 # Agregar el directorio actual al path para imports
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
@@ -67,11 +70,14 @@ def api_root():
         }
     }
 
-# Servir archivos estáticos de React (sin cambios)
+# Servir archivos estáticos de React
+print("📁 Verificando archivos estáticos...")
 if os.path.exists("static"):
+    print("✅ Carpeta static encontrada")
     # Montar la subcarpeta static/static en la ruta /static
     if os.path.exists("static/static"):
         app.mount("/static", StaticFiles(directory="static/static"), name="static")
+        print("✅ Archivos estáticos montados en /static")
     
     # Servir index.html para las rutas raíz
     @app.get("/")
@@ -87,3 +93,7 @@ if os.path.exists("static"):
             return FileResponse(file_path)
         # Si no existe, servir index.html para React Router
         return FileResponse("static/index.html")
+else:
+    print("⚠️ Carpeta static NO encontrada")
+
+print("✅ Aplicación configurada y lista")
