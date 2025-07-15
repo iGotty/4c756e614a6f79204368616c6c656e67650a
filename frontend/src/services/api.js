@@ -1,8 +1,11 @@
 // src/services/api.js
 
+// Get API URL from environment or fallback
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+
 // Base URLs
-const API_BASE_URL = '/api';
-const API_V1_URL = '/api/v1';
+const API_BASE_URL = `${API_URL}/api`;
+const API_V1_URL = `${API_URL}/api/v1`;
 
 // Helper function to handle API responses
 const handleResponse = async (response) => {
@@ -217,5 +220,24 @@ export const healthCheck = async () => {
   } catch (error) {
     console.error('Health check failed:', error);
     throw error;
+  }
+};
+
+// System/UI config (update the URL)
+export const getUIConfig = async () => {
+  try {
+    const response = await fetch(`${API_URL}/api/system/ui-config`);
+    return handleResponse(response);
+  } catch (error) {
+    console.error('Failed to fetch UI config:', error);
+    // Return default config if API fails
+    return {
+      animated_stats: {
+        active_professionals: 500,
+        total_matches: 10000,
+        success_rate: 94,
+        states_covered: 50
+      }
+    };
   }
 };

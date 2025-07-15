@@ -1,3 +1,4 @@
+// src/App.js
 import React, { useState, useEffect } from 'react';
 import './App.css';
 
@@ -16,8 +17,8 @@ import HowItWorks from './components/sections/HowItWorks';
 // Icons
 import { Shield, Zap, Heart, ArrowRight, Sparkles } from 'lucide-react';
 
-// Services
-import { matchingAPI, interactionAPI, healthCheck } from './services/api';
+// Services - Updated import
+import { matchingAPI, interactionAPI, healthCheck, getUIConfig } from './services/api';
 
 // Logo
 import LogoWhite from './assets/images/logo/lunajoy-logo-white.png';
@@ -116,11 +117,11 @@ function AppContent() {
 
   const fetchUIConfig = async () => {
     try {
-      const response = await fetch('/api/system/ui-config');
-      const config = await response.json();
+      const config = await getUIConfig();
       setMatchStats(config.animated_stats);
     } catch (err) {
       console.error('Error fetching UI config:', err);
+      // Will use default values from getUIConfig
     }
   };
 
@@ -282,7 +283,7 @@ function AppContent() {
         <div className="bg-amber-50 border-b border-amber-200">
           <div className="max-w-7xl mx-auto px-4 py-3">
             <ErrorMessage
-              message="Connection issue detected. Make sure the backend is running at http://127.0.0.1:8000"
+              message={`Connection issue detected. Backend URL: ${process.env.REACT_APP_API_URL || 'http://localhost:8000'}`}
               type="warning"
             />
           </div>

@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Star, Calendar, Award, Users, MapPin, Clock, Shield, Heart, Video, MessageCircle, ChevronRight, Check, Briefcase, GraduationCap, Activity, Phone } from 'lucide-react';
 
+// Get API URL from environment
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+
 const ClinicianDetailModal = ({ clinician, isOpen, onClose, onContact, onSchedule }) => {
   const [activeTab, setActiveTab] = useState('overview');
   const [imageLoaded, setImageLoaded] = useState(false);
@@ -12,7 +15,7 @@ const ClinicianDetailModal = ({ clinician, isOpen, onClose, onContact, onSchedul
       if (!clinician?.clinician_id) return;
       
       try {
-        const response = await fetch(`/api/v1/clinicians/${clinician.clinician_id}`);
+        const response = await fetch(`${API_URL}/api/v1/clinicians/${clinician.clinician_id}`);
         if (response.ok) {
           const data = await response.json();
           setDetailedInfo(data);

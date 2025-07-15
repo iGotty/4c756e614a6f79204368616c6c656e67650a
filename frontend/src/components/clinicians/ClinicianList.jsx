@@ -4,6 +4,9 @@ import LoadingSpinner from '../common/LoadingSpinner';
 import ErrorMessage from '../common/ErrorMessage';
 import { CLINICAL_NEEDS_DISPLAY } from '../../utils/constants';
 
+// Get API URL from environment
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+
 const ClinicianList = ({ 
   clinicians, 
   loading, 
@@ -35,7 +38,7 @@ const ClinicianList = ({
     setLoadingDetails(prev => ({ ...prev, [clinicianId]: true }));
 
     try {
-      const response = await fetch(`/api/v1/clinicians/${clinicianId}`);
+      const response = await fetch(`${API_URL}/api/v1/clinicians/${clinicianId}`);
       if (response.ok) {
         const data = await response.json();
         setClinicianDetails(prev => ({ ...prev, [clinicianId]: data }));
