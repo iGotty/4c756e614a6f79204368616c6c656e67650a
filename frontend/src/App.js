@@ -140,7 +140,7 @@ function AppContent() {
         clinical_needs: formData.appointment_type === 'medication' ? [] : formData.clinical_needs
       };
 
-      // Add limit to get exactly 9 results
+      // Add limit to get 9 results
       const searchWithLimit = { ...cleanedPreferences, limit: 9 };
 
       // Choose the appropriate endpoint based on authentication status

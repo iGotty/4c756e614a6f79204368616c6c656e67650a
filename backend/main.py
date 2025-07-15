@@ -170,12 +170,7 @@ def api_root():
             "detail": "/api/v1/clinicians/{clinician_id}"
         }
     
-    if "interaction" in LOADED_ROUTES:
-        endpoints["interactions"] = {
-            "view": "/api/v1/interactions/view",
-            "contact": "/api/v1/interactions/contact",
-            "book": "/api/v1/interactions/book"
-        }
+
     
     if "system" in LOADED_ROUTES:
         endpoints["system"] = {
