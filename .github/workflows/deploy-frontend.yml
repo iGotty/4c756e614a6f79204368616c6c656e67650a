@@ -5,7 +5,7 @@ on:
     branches:
       - main
     paths:
-      - 'frontend/**'  # Solo se activa si hay cambios en la carpeta frontend
+      - 'frontend/**'
       - '.github/workflows/deploy-frontend.yml'
   workflow_dispatch:
 
@@ -15,13 +15,13 @@ jobs:
     
     defaults:
       run:
-        working-directory: ./frontend  # Ajusta según tu estructura
+        working-directory: ./frontend
 
     steps:
     - uses: actions/checkout@v4
 
     - name: Set up Node.js
-      uses: actions/setup-node@v3
+      uses: actions/setup-node@v4
       with:
         node-version: '20.x'
         cache: 'npm'
@@ -33,7 +33,7 @@ jobs:
     - name: Build
       run: npm run build
       env:
-        CI: false  # Ignora warnings de ESLint
+        CI: false
         REACT_APP_API_URL: https://4c756e614a6f79204368616c6c656e67650a.azurewebsites.net
 
     - name: Copy web.config for Azure
@@ -62,13 +62,13 @@ jobs:
         EOF
 
     - name: Upload artifact for deployment
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: frontend-build
         path: ./frontend/build
 
     - name: Deploy to Azure Web App
-      uses: azure/webapps-deploy@v2
+      uses: azure/webapps-deploy@v3
       with:
         app-name: 'LunaJoyMatchingEngine'
         slot-name: 'Production'
