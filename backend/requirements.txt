@@ -1,4 +1,18 @@
+# requirements.txt
+# FastAPI y servidor
 fastapi==0.104.1
 uvicorn[standard]==0.24.0
-gunicorn==21.2.0
+
+# Validación de datos
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# Variables de entorno
+python-dotenv==1.0.0
+
+# Para CORS y manejo de archivos
 python-multipart==0.0.6
+
+# Machine Learning (necesario para clustering y collaborative filtering)
+numpy==1.24.3
+scikit-learn==1.3.2
