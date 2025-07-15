@@ -11,10 +11,9 @@ import ClinicianList from './components/clinicians/ClinicianList';
 import ClinicianDetailModal from './components/clinicians/ClinicianDetailModal';
 import LoginModal from './components/auth/LoginModal';
 import ErrorMessage from './components/common/ErrorMessage';
-import LoadingSpinner from './components/common/LoadingSpinner';
 
 // Icons
-import { TrendingUp, Users, Shield, Zap, Heart, Star, ArrowRight, Sparkles, Activity } from 'lucide-react';
+import { Users, Shield, Zap, Heart, Star, ArrowRight, Sparkles } from 'lucide-react';
 
 // Services
 import { matchingAPI, interactionAPI, healthCheck } from './services/api';
@@ -58,7 +57,6 @@ function AppContent() {
   const [searchParams, setSearchParams] = useState({});
   const [apiHealth, setApiHealth] = useState(null);
   const [matchStats, setMatchStats] = useState(null);
-  const [uiConfig, setUiConfig] = useState(null);
   const [showHero, setShowHero] = useState(true);
   
   const { user, isAuthenticated } = useUser();
@@ -96,7 +94,6 @@ function AppContent() {
     try {
       const response = await fetch('/api/system/ui-config');
       const config = await response.json();
-      setUiConfig(config);
       setMatchStats(config.animated_stats);
     } catch (err) {
       console.error('Error fetching UI config:', err);
@@ -467,17 +464,17 @@ function AppContent() {
             <div>
               <h4 className="font-semibold mb-4">Company</h4>
               <ul className="space-y-2 text-gray-400 text-sm">
-                <li><a href="#" className="hover:text-white transition-colors">About Us</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">How It Works</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">For Providers</a></li>
+                <li><a href="#about" className="hover:text-white transition-colors">About Us</a></li>
+                <li><a href="#how-it-works" className="hover:text-white transition-colors">How It Works</a></li>
+                <li><a href="#for-providers" className="hover:text-white transition-colors">For Providers</a></li>
               </ul>
             </div>
             <div>
               <h4 className="font-semibold mb-4">Support</h4>
               <ul className="space-y-2 text-gray-400 text-sm">
-                <li><a href="#" className="hover:text-white transition-colors">Help Center</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Contact Us</a></li>
-                <li><a href="#" className="hover:text-white transition-colors">Privacy Policy</a></li>
+                <li><a href="#help" className="hover:text-white transition-colors">Help Center</a></li>
+                <li><a href="#contact" className="hover:text-white transition-colors">Contact Us</a></li>
+                <li><a href="#privacy" className="hover:text-white transition-colors">Privacy Policy</a></li>
               </ul>
             </div>
             <div>

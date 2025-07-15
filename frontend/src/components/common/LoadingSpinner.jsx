@@ -30,7 +30,7 @@ const LoadingSpinner = ({ size = 'medium', message = 'Loading...', variant = 'de
 
       return () => clearInterval(interval);
     }
-  }, [variant]);
+  }, [variant, tips.length]); // Añadido tips.length a las dependencias
 
   useEffect(() => {
     if (variant === 'affirmation') {
