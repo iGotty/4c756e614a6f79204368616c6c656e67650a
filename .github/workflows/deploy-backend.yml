@@ -1,0 +1,98 @@
+name: Deploy Backend API to Azure
+
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'backend/**'
+      - '.github/workflows/deploy-backend.yml'
+  workflow_dispatch:
+
+env:
+  AZURE_WEBAPP_NAME: '4c756e614a6f79204368616c6c656e65610a'  # Tu App Service actual
+  PYTHON_VERSION: '3.11'
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    # Setup Python
+    - name: Setup Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ env.PYTHON_VERSION }}
+        
+    - name: Install Python dependencies
+      run: |
+        cd backend
+        python -m pip install --upgrade pip
+        
+        # Crear requirements.txt limpio (sin Windows packages)
+        echo "📦 Creating clean requirements.txt"
+        grep -v "pywin32" requirements.txt > requirements-clean.txt || cp requirements.txt requirements-clean.txt
+        
+        # Instalar dependencias
+        pip install -r requirements-clean.txt
+        cd ..
+        
+    # Verify data files exist
+    - name: Verify data files
+      run: |
+        echo "📁 Checking for data files..."
+        if [ -d "backend/data" ]; then
+          echo "✅ Data directory found in backend/"
+          ls -la backend/data/
+        elif [ -d "data" ]; then
+          echo "📁 Data directory found in root, copying to backend/"
+          cp -r data backend/
+          ls -la backend/data/
+        else
+          echo "⚠️ No data directory found!"
+        fi
+        
+    # Create startup.txt
+    - name: Create startup configuration
+      run: |
+        cd backend
+        echo "gunicorn --bind=0.0.0.0:8000 --timeout 600 --access-logfile '-' --error-logfile '-' --workers 4 --worker-class uvicorn.workers.UvicornWorker main:app" > startup.txt
+        echo "✅ Created startup.txt"
+        cd ..
+        
+    # Create deployment package
+    - name: Create deployment package
+      run: |
+        cd backend
+        
+        # List contents
+        echo "📋 Backend directory contents:"
+        ls -la
+        
+        # Create zip excluding unnecessary files
+        zip -r ../deploy.zip . \
+          -x "*.pyc" \
+          -x "__pycache__/*" \
+          -x "venv/*" \
+          -x ".git/*" \
+          -x "*.db" \
+          -x ".env*" \
+          -x ".pytest_cache/*" \
+          -x "tests/*" \
+          -x "static/*" \
+          -x "node_modules/*"
+          
+        cd ..
+        
+        # Show package info
+        echo "📦 Deployment package created:"
+        ls -lh deploy.zip
+        
+    # Deploy to Azure
+    - name: Deploy to Azure Web App
+      uses: azure/webapps-deploy@v2
+      with:
+        app-name: ${{ env.AZURE_WEBAPP_NAME }}
+        publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+        package: ./deploy.zip
