@@ -2,6 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { Menu, X, User, Heart, Calendar, LogOut, Sparkles } from 'lucide-react';
 import { useUser } from '../../contexts/UserContext';
 
+// Import logos
+import LogoWhite from '../../assets/images/logo/lunajoy-logo-white.png';
+import LogoDark from '../../assets/images/logo/lunajoy-logo-dark.png';
+
 const Header = ({ onLoginClick }) => {
   const { user, isAuthenticated, logout } = useUser();
   const [isScrolled, setIsScrolled] = useState(false);
@@ -34,18 +38,26 @@ const Header = ({ onLoginClick }) => {
         <div className="flex items-center justify-between h-20">
           {/* Logo */}
           <div className="flex items-center">
-            <a href="/" className="flex items-center space-x-3 group">
-              <div className="relative">
-                <div className="absolute inset-0 bg-sunshine rounded-full opacity-20 group-hover:opacity-30 transition-opacity blur-lg"></div>
-                <div className="relative w-10 h-10 bg-forest-gradient rounded-full flex items-center justify-center transform group-hover:scale-110 transition-transform">
-                  <span className="text-white text-xl">🌙</span>
-                </div>
+            <a href="/" className="flex items-center group">
+              {/* Logo con transición */}
+              <div className="relative h-10 w-36 sm:w-44">
+                {/* Logo Blanco - visible cuando NO hay scroll */}
+                <img
+                  src={LogoWhite}
+                  alt="LunaJoy"
+                  className={`absolute inset-0 h-full w-full object-contain object-left transition-opacity duration-500 ${
+                    isScrolled ? 'opacity-0' : 'opacity-100'
+                  }`}
+                />
+                {/* Logo Oscuro - visible cuando HAY scroll - Escala aumentada */}
+                <img
+                  src={LogoDark}
+                  alt="LunaJoy"
+                  className={`absolute inset-0 h-full w-full object-contain object-left transition-opacity duration-500 transform scale-[1.0] ${
+                    isScrolled ? 'opacity-100' : 'opacity-0'
+                  }`}
+                />
               </div>
-              <span className={`text-2xl font-display font-bold ${
-                isScrolled ? 'text-forest-700' : 'text-white'
-              } group-hover:text-forest-500 transition-colors`}>
-                LunaJoy
-              </span>
             </a>
           </div>
 

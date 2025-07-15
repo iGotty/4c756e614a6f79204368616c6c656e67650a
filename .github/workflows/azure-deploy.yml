@@ -23,7 +23,7 @@ jobs:
       with:
         node-version: ${{ env.NODE_VERSION }}
         
-    - name: Install and build React app
+    - name: Install and build LunaJoy Matching Engine
       run: |
         cd frontend
         npm ci
