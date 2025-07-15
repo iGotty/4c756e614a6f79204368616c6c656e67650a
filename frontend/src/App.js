@@ -11,9 +11,10 @@ import ClinicianList from './components/clinicians/ClinicianList';
 import ClinicianDetailModal from './components/clinicians/ClinicianDetailModal';
 import LoginModal from './components/auth/LoginModal';
 import ErrorMessage from './components/common/ErrorMessage';
+import HowItWorks from './components/sections/HowItWorks';
 
 // Icons
-import { Users, Shield, Zap, Heart, Star, ArrowRight, Sparkles } from 'lucide-react';
+import { Shield, Zap, Heart, ArrowRight, Sparkles } from 'lucide-react';
 
 // Services
 import { matchingAPI, interactionAPI, healthCheck } from './services/api';
@@ -48,6 +49,7 @@ function AnimatedCounter({ end, duration = 2000, prefix = '', suffix = '' }) {
 // Main App Component (wrapped with UserProvider)
 function AppContent() {
   // State management
+  const [currentView, setCurrentView] = useState('home'); // 'home', 'how-it-works', 'search-results'
   const [searchResults, setSearchResults] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
@@ -57,9 +59,28 @@ function AppContent() {
   const [searchParams, setSearchParams] = useState({});
   const [apiHealth, setApiHealth] = useState(null);
   const [matchStats, setMatchStats] = useState(null);
-  const [showHero, setShowHero] = useState(true);
   
   const { user, isAuthenticated } = useUser();
+
+  // Handle navigation from URL hash
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.slice(1);
+      if (hash === 'how-it-works') {
+        setCurrentView('how-it-works');
+      } else if (hash === 'home' || hash === '') {
+        setCurrentView('home');
+        setSearchResults(null);
+      }
+    };
+
+    // Check initial hash
+    handleHashChange();
+
+    // Listen for hash changes
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
 
   // Check API health and load UI config on mount
   useEffect(() => {
@@ -104,7 +125,7 @@ function AppContent() {
     setLoading(true);
     setError(null);
     setSearchParams(formData);
-    setShowHero(false);
+    setCurrentView('search-results');
 
     try {
       let response;
@@ -239,7 +260,14 @@ function AppContent() {
   const handleNewSearch = () => {
     setSearchResults(null);
     setError(null);
-    setShowHero(true);
+    setCurrentView('home');
+    window.location.hash = '#home';
+  };
+
+  const navigateToHome = () => {
+    setCurrentView('home');
+    setSearchResults(null);
+    window.location.hash = '#home';
   };
 
   return (
@@ -258,78 +286,66 @@ function AppContent() {
         </div>
       )}
 
-      {/* Main Content */}
+      {/* Main Content - Conditional Rendering based on currentView */}
       <main className="pt-20">
-        {!searchResults ? (
-          // Search Form View with Hero
+        {/* HOME VIEW */}
+        {currentView === 'home' && (
           <>
-            {showHero && (
-              <section className="relative bg-gradient-to-b from-forest-700 to-forest-800 overflow-hidden">
-                <div className="relative max-w-7xl mx-auto px-4 py-20 lg:py-32">
-                  <div className="text-center max-w-4xl mx-auto">
-                    <h1 className="text-4xl md:text-5xl lg:text-6xl font-display font-bold text-white mb-6 animate-fade-in-up">
-                      Your journey to wellness starts with the right match
-                    </h1>
-                    <p className="text-xl text-gray-200 mb-12 animate-fade-in-up animation-delay-200">
-                      Connect with licensed mental health professionals who understand your unique needs
-                    </p>
+            {/* Hero Section */}
+            <section className="relative bg-gradient-to-b from-forest-700 to-forest-800 overflow-hidden">
+              <div className="relative max-w-7xl mx-auto px-4 py-20 lg:py-32">
+                <div className="text-center max-w-4xl mx-auto">
+                  <h1 className="text-4xl md:text-5xl lg:text-6xl font-display font-bold text-white mb-6 animate-fade-in-up">
+                    Your journey to wellness starts with the right match
+                  </h1>
+                  <p className="text-xl text-gray-200 mb-12 animate-fade-in-up animation-delay-200">
+                    Connect with licensed mental health professionals who understand your unique needs
+                  </p>
 
-                    {/* Stats Row with Animation */}
-                    {matchStats && (
-                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12 animate-fade-in-up animation-delay-400">
-                        <div className="bg-white/10 backdrop-blur rounded-xl p-4">
-                          <p className="text-3xl font-bold text-white">
-                            <AnimatedCounter end={matchStats.active_professionals} suffix="+" />
-                          </p>
-                          <p className="text-gray-200 text-sm">Verified Professionals</p>
-                        </div>
-                        <div className="bg-white/10 backdrop-blur rounded-xl p-4">
-                          <p className="text-3xl font-bold text-white">
-                            <AnimatedCounter end={matchStats.total_matches} />
-                          </p>
-                          <p className="text-gray-200 text-sm">Successful Matches</p>
-                        </div>
-                        <div className="bg-white/10 backdrop-blur rounded-xl p-4">
-                          <p className="text-3xl font-bold text-white">
-                            <AnimatedCounter end={matchStats.success_rate} suffix="%" />
-                          </p>
-                          <p className="text-gray-200 text-sm">Satisfaction Rate</p>
-                        </div>
-                        <div className="bg-white/10 backdrop-blur rounded-xl p-4">
-                          <p className="text-3xl font-bold text-white">
-                            <AnimatedCounter end={matchStats.states_covered} />
-                          </p>
-                          <p className="text-gray-200 text-sm">States Covered</p>
-                        </div>
+                  {/* Stats Row with Animation */}
+                  {matchStats && (
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-12 animate-fade-in-up animation-delay-400">
+                      <div className="bg-white/10 backdrop-blur rounded-xl p-4">
+                        <p className="text-3xl font-bold text-white">
+                          <AnimatedCounter end={matchStats.active_professionals} suffix="+" />
+                        </p>
+                        <p className="text-gray-200 text-sm">Verified Professionals</p>
                       </div>
-                    )}
+                      <div className="bg-white/10 backdrop-blur rounded-xl p-4">
+                        <p className="text-3xl font-bold text-white">
+                          <AnimatedCounter end={matchStats.total_matches} />
+                        </p>
+                        <p className="text-gray-200 text-sm">Successful Matches</p>
+                      </div>
+                      <div className="bg-white/10 backdrop-blur rounded-xl p-4">
+                        <p className="text-3xl font-bold text-white">
+                          <AnimatedCounter end={matchStats.success_rate} suffix="%" />
+                        </p>
+                        <p className="text-gray-200 text-sm">Satisfaction Rate</p>
+                      </div>
+                      <div className="bg-white/10 backdrop-blur rounded-xl p-4">
+                        <p className="text-3xl font-bold text-white">
+                          <AnimatedCounter end={matchStats.states_covered} />
+                        </p>
+                        <p className="text-gray-200 text-sm">States Covered</p>
+                      </div>
+                    </div>
+                  )}
 
-                    <button
-                      onClick={() => document.getElementById('search-section').scrollIntoView({ behavior: 'smooth' })}
-                      className="bg-white text-forest-700 px-8 py-4 rounded-full font-semibold text-lg hover:bg-gray-100 transition-all transform hover:scale-105 shadow-xl animate-fade-in-up animation-delay-600 inline-flex items-center space-x-2"
-                    >
-                      <span>Start Your Journey</span>
-                      <ArrowRight className="w-5 h-5" />
-                    </button>
-                  </div>
+                  <button
+                    onClick={() => document.getElementById('search-section').scrollIntoView({ behavior: 'smooth' })}
+                    className="bg-white text-forest-700 px-8 py-4 rounded-full font-semibold text-lg hover:bg-gray-100 transition-all transform hover:scale-105 shadow-xl animate-fade-in-up animation-delay-600 inline-flex items-center space-x-2"
+                  >
+                    <span>Start Your Journey</span>
+                    <ArrowRight className="w-5 h-5" />
+                  </button>
                 </div>
-              </section>
-            )}
+              </div>
+            </section>
 
             {/* Search Section */}
             <section id="search-section" className="py-16 lg:py-24">
               <div className="max-w-4xl mx-auto px-4">
-                {!showHero && (
-                  <div className="text-center mb-12 animate-fade-in-down">
-                    <h2 className="text-3xl md:text-4xl font-display font-bold text-gray-900 mb-4">
-                      Find Your Perfect Match
-                    </h2>
-                    <p className="text-lg text-gray-600">
-                      Answer a few questions to get personalized recommendations
-                    </p>
-                  </div>
-                )}
-
                 <div className="bg-white rounded-3xl shadow-lg p-8 lg:p-12 animate-scale-in">
                   <SearchForm
                     onSearch={handleSearch}
@@ -364,42 +380,29 @@ function AppContent() {
                 </div>
               </div>
             </section>
-
-            {/* How It Works */}
-            <section className="py-16 bg-gray-100">
-              <div className="max-w-6xl mx-auto px-4">
-                <h2 className="text-3xl font-display font-bold text-center text-gray-900 mb-12">
-                  How LunaJoy Works
-                </h2>
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-8">
-                  {[
-                    { step: 1, title: 'Share Your Needs', desc: 'Tell us about your preferences and goals', icon: Heart },
-                    { step: 2, title: 'Get Matched', desc: 'Our AI finds your perfect professional match', icon: Sparkles },
-                    { step: 3, title: 'Review & Choose', desc: 'Browse detailed profiles and availability', icon: Users },
-                    { step: 4, title: 'Start Healing', desc: 'Book your first session and begin your journey', icon: Star }
-                  ].map((item, idx) => (
-                    <div key={idx} className="text-center animate-fade-in-up" style={{ animationDelay: `${idx * 100}ms` }}>
-                      <div className="relative">
-                        <div className="w-20 h-20 bg-white rounded-full flex items-center justify-center mx-auto mb-4 shadow-md">
-                          <item.icon className="w-10 h-10 text-forest-600" />
-                        </div>
-                        {idx < 3 && (
-                          <div className="hidden md:block absolute top-10 left-full w-full -translate-x-8">
-                            <div className="w-16 h-0.5 bg-gray-300"></div>
-                          </div>
-                        )}
-                      </div>
-                      <h3 className="font-semibold text-gray-900 mb-2">{item.title}</h3>
-                      <p className="text-gray-600 text-sm">{item.desc}</p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </section>
           </>
-        ) : (
-          // Results View
-          <section className="py-8">
+        )}
+
+        {/* HOW IT WORKS VIEW */}
+        {currentView === 'how-it-works' && (
+          <div className="animate-fade-in">
+            <HowItWorks />
+            {/* Back to Home Button */}
+            <div className="text-center pb-12">
+              <button
+                onClick={navigateToHome}
+                className="text-forest-600 hover:text-forest-700 font-medium inline-flex items-center space-x-2 group"
+              >
+                <ArrowRight className="w-5 h-5 transform rotate-180 group-hover:-translate-x-1 transition-transform" />
+                <span>Back to Home</span>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* SEARCH RESULTS VIEW */}
+        {currentView === 'search-results' && searchResults && (
+          <section className="py-8 animate-fade-in">
             <div className="max-w-7xl mx-auto px-4">
               {/* Back Button */}
               <div className="mb-8">
