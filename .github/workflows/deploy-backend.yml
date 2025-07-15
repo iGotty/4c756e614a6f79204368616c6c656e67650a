@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
 
 env:
-  AZURE_WEBAPP_NAME: '4c756e614a6f79204368616c6c656e65610a'  # Tu App Service actual
+  AZURE_WEBAPP_NAME: 'lunajoy-backend-api' 
   PYTHON_VERSION: '3.11'
 
 jobs:
@@ -50,7 +50,9 @@ jobs:
           cp -r data backend/
           ls -la backend/data/
         else
-          echo "⚠️ No data directory found!"
+          echo "⚠️ No data directory found! Creating sample data..."
+          mkdir -p backend/data
+          # Aquí podrías crear archivos de datos de ejemplo si es necesario
         fi
         
     # Create startup.txt
@@ -66,7 +68,7 @@ jobs:
       run: |
         cd backend
         
-        # List contents
+        # List contents for debugging
         echo "📋 Backend directory contents:"
         ls -la
         
@@ -81,7 +83,8 @@ jobs:
           -x ".pytest_cache/*" \
           -x "tests/*" \
           -x "static/*" \
-          -x "node_modules/*"
+          -x "node_modules/*" \
+          -x ".vscode/*"
           
         cd ..
         
@@ -91,8 +94,25 @@ jobs:
         
     # Deploy to Azure
     - name: Deploy to Azure Web App
-      uses: azure/webapps-deploy@v3  # Cambiar a v3
+      uses: azure/webapps-deploy@v3
       with:
-        app-name: '4c756e614a6f79204368616c6c656e65610a'
+        app-name: ${{ env.AZURE_WEBAPP_NAME }}
         publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE_BACKEND }}
         package: ./deploy.zip
+        
+    # Verify deployment
+    - name: Verify deployment
+      run: |
+        echo "⏳ Waiting for deployment to stabilize..."
+        sleep 30
+        
+        echo "🔍 Checking health endpoint..."
+        response=$(curl -s -o /dev/null -w "%{http_code}" https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net/api/health)
+        
+        if [ $response -eq 200 ]; then
+          echo "✅ Backend is healthy!"
+          echo "📚 API Docs: https://${{ env.AZURE_WEBAPP_NAME }}.azurewebsites.net/docs"
+        else
+          echo "❌ Health check failed with status: $response"
+          exit 1
+        fi
