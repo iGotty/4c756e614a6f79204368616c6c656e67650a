@@ -1,3 +1,4 @@
+#list of Python dependencies for the backend
 annotated-types==0.7.0
 anyio==3.7.1
 asttokens==3.0.0
