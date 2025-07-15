@@ -1,11 +1,10 @@
-# app/core/matching_engine.py
 from typing import List, Dict, Optional, Tuple
 import time
 from datetime import datetime, timedelta
 import numpy as np
 
 from app.models.user import User, StatedPreferences
-from app.models.match import MatchResult, MatchResponse, ScoreComponents, MatchExplanation
+from app.models.match import MatchResult, MatchResponse, ScoreComponents, MatchExplanation, OverlappingAttributes
 from app.services.data_loader import data_loader
 from app.core.filters import MatchingFilters
 from app.core.scoring import ScoringEngine
@@ -38,6 +37,10 @@ class MatchingEngine:
         """
         start_time = time.time()
         
+        print(f"\n=== DEBUG MATCH PRINCIPAL ===")
+        print(f"Tipo de usuario: {user.registration_type}")
+        print(f"Limit recibido: {limit}")
+        
         # Logging del tipo de matching
         logger.info(f"Iniciando matching para usuario {user.registration_type}")
         logger.info(f"Estado: {user.stated_preferences.state}, "
@@ -46,6 +49,7 @@ class MatchingEngine:
         
         # Delegar según tipo de usuario
         if user.is_anonymous():
+            print(f"Delegando a _match_anonymous con limit={limit}")
             response = self._match_anonymous(user, limit, include_explanations)
         elif user.is_basic():
             response = self._match_basic(user, limit, include_explanations)
@@ -62,6 +66,8 @@ class MatchingEngine:
         logger.info(f"Matching completado: {response.total_matches} resultados "
                    f"en {response.processing_time_ms:.2f}ms")
         
+        print(f"Respuesta final: {response.total_matches} matches")
+        print("=== FIN DEBUG PRINCIPAL ===\n")
         
         return response
     
@@ -77,15 +83,19 @@ class MatchingEngine:
         - Top 5 matches genéricos
         """
         logger.debug("Ejecutando matching para usuario anónimo")
+        print(f"\n=== DEBUG MATCHING ANÓNIMO ===")
+        print(f"Limit solicitado: {limit}")
         
         # 1. Obtener clínicos y aplicar filtros duros
         all_clinicians = data_loader.get_clinicians_for_matching()
+        print(f"Total clínicos en sistema: {len(all_clinicians)}")
         
         filtered_clinicians = self.filters.apply_hard_filters(
             clinicians=all_clinicians,
             preferences=user.stated_preferences
         )
         
+        print(f"Después de filtros duros: {len(filtered_clinicians)} clínicos")
         
         if not filtered_clinicians:
             return self._empty_response(user, 0)
@@ -102,11 +112,14 @@ class MatchingEngine:
             )
             scored_clinicians.append((clinician, score, components))
         
+        print(f"Después de scoring: {len(scored_clinicians)} clínicos")
         
         # 3. Ordenar y limitar según el parámetro limit
         scored_clinicians.sort(key=lambda x: x[1], reverse=True)
+        print(f"Aplicando límite de {limit}...")
         top_clinicians = scored_clinicians[:limit]
         
+        print(f"Top clínicos seleccionados: {len(top_clinicians)}")
         
         # 4. Generar respuesta
         matches = self._create_match_results(
@@ -115,7 +128,9 @@ class MatchingEngine:
             include_explanations,
             strategy="content_based"
         )
-
+        
+        print(f"Matches finales generados: {len(matches)}")
+        print("=== FIN DEBUG ===\n")
         
         return MatchResponse(
             user_type=user.registration_type,
@@ -572,6 +587,81 @@ class MatchingEngine:
         
         return boost
     
+    def _calculate_overlapping_attributes(
+        self,
+        clinician: Dict,
+        user: User
+    ) -> OverlappingAttributes:
+        """
+        Calcula qué atributos del usuario coinciden con el clínico.
+        """
+        preferences = user.stated_preferences
+        basic_info = clinician.get('basic_info', {})
+        profile = clinician.get('profile_features', {})
+        
+        # 1. Estado - siempre debe ser True porque pasó los filtros duros
+        state_match = preferences.state in basic_info.get('license_states', [])
+        
+        # 2. Idioma - verificar si habla el idioma preferido
+        language_match = False
+        if preferences.language:
+            clinician_languages = profile.get('languages', [])
+            language_match = preferences.language in clinician_languages
+        else:
+            # Si no hay preferencia de idioma, considerarlo como match
+            language_match = True
+        
+        # 3. Género - verificar si coincide con la preferencia
+        gender_match = True  # Por defecto es True si no hay preferencia
+        if preferences.gender_preference:
+            clinician_gender = profile.get('gender', '')
+            gender_match = clinician_gender == preferences.gender_preference
+        
+        # 4. Seguro - verificar si acepta el seguro del usuario
+        insurance_match = self._accepts_insurance(clinician, user)
+        
+        # 5. Especialidades - encontrar las que coinciden
+        matching_specialties = []
+        if preferences.clinical_needs:
+            clinician_specialties = set(profile.get('specialties', []))
+            user_needs = set(preferences.clinical_needs)
+            matching_specialties = list(user_needs & clinician_specialties)
+        
+        # 6. Horarios - encontrar los que coinciden (simulado)
+        matching_time_slots = []
+        if preferences.preferred_time_slots:
+            # Usar los datos marcados por filters si existen
+            matching_time_slots = clinician.get('_matching_time_slots', [])
+            
+            # Si no hay datos marcados, simular
+            if not matching_time_slots:
+                import hashlib
+                clinician_id = clinician.get('clinician_id', '')
+                for slot in preferences.preferred_time_slots:
+                    # Simulación determinística de disponibilidad
+                    hash_val = int(hashlib.md5(f"{clinician_id}{slot}".encode()).hexdigest()[:8], 16)
+                    slot_probabilities = {
+                        "mornings": 80,
+                        "afternoons": 90,
+                        "evenings": 70,
+                        "weekends": 50
+                    }
+                    if (hash_val % 100) < slot_probabilities.get(slot, 50):
+                        matching_time_slots.append(slot)
+        
+        # 7. Tipo de cita - siempre debe ser True porque pasó los filtros duros
+        appointment_type_match = preferences.appointment_type in basic_info.get('appointment_types', [])
+        
+        return OverlappingAttributes(
+            state=state_match,
+            language=language_match,
+            gender_preference=gender_match,
+            insurance=insurance_match,
+            specialties=matching_specialties,
+            time_slots=matching_time_slots,
+            appointment_type=appointment_type_match
+        )
+    
     def _create_match_results(
         self,
         scored_clinicians: List[Tuple[Dict, float, ScoreComponents]],
@@ -589,6 +679,12 @@ class MatchingEngine:
             profile = clinician.get('profile_features', {})
             availability = clinician.get('availability_features', {})
             
+            # Normalizar score para que nunca exceda 1.0
+            normalized_score = min(score, 1.0)
+            
+            # Calcular atributos coincidentes
+            overlapping_attrs = self._calculate_overlapping_attributes(clinician, user)
+            
             # Generar explicación
             explanation = None
             if include_explanations:
@@ -596,14 +692,15 @@ class MatchingEngine:
                     clinician=clinician,
                     user=user,
                     components=components,
-                    strategy=strategy
+                    strategy=strategy,
+                    overlapping_attrs=overlapping_attrs
                 )
             
             # Crear match result
             match = MatchResult(
                 clinician_id=clinician.get('clinician_id'),
                 clinician_name=basic_info.get('full_name', 'Unknown'),
-                match_score=score,
+                match_score=normalized_score,  # Score normalizado
                 rank_position=rank,
                 is_available=availability.get('immediate_availability', False),
                 accepts_insurance=self._accepts_insurance(clinician, user),
@@ -611,6 +708,7 @@ class MatchingEngine:
                 languages=profile.get('languages', []),
                 gender=profile.get('gender', 'unknown'),
                 years_experience=profile.get('years_experience', 0),
+                overlapping_attributes=overlapping_attrs,
                 score_components=components,
                 explanation=explanation,
                 matching_strategy=strategy
@@ -625,7 +723,8 @@ class MatchingEngine:
         clinician: Dict,
         user: User,
         components: ScoreComponents,
-        strategy: str
+        strategy: str,
+        overlapping_attrs: OverlappingAttributes
     ) -> MatchExplanation:
         """
         Genera explicación adaptada al tipo de usuario y estrategia.
@@ -638,71 +737,82 @@ class MatchingEngine:
         profile = clinician.get('profile_features', {})
         availability = clinician.get('availability_features', {})
         
-        # Razones comunes
+        # Common reasons
         if availability.get('immediate_availability') and user.is_urgent():
-            primary_reasons.append("Disponible inmediatamente")
+            primary_reasons.append("Available immediately")
             matching_attributes.append("availability")
         elif availability.get('immediate_availability'):
-            primary_reasons.append("Disponible para citas")
+            primary_reasons.append("Available for appointments")
             matching_attributes.append("availability")
         
-        if components.insurance_match == 1.0 and user.has_insurance():
-            primary_reasons.append(f"Acepta {user.stated_preferences.insurance_provider}")
+        # Only add insurance message if user has insurance
+        if overlapping_attrs.insurance and user.has_insurance():
+            primary_reasons.append(f"Accepts your {user.stated_preferences.insurance_provider} insurance")
             matching_attributes.append("insurance")
-        elif components.insurance_match == 0.5 and not user.has_insurance():
-            primary_reasons.append("Acepta pacientes sin seguro")
+        elif overlapping_attrs.insurance and not user.has_insurance():
+            primary_reasons.append("Accepts patients without insurance")
+            matching_attributes.append("no_insurance")
         
-        # Especialidades
-        if user.stated_preferences.clinical_needs:
-            matching_specs = (set(user.stated_preferences.clinical_needs) & 
-                            set(profile.get('specialties', [])))
-            if matching_specs:
-                spec_list = list(matching_specs)[:2]
-                primary_reasons.append(f"Especialista en {', '.join(spec_list)}")
-                matching_attributes.extend(spec_list)
+        # Specialties
+        if overlapping_attrs.specialties:
+            spec_list = overlapping_attrs.specialties[:2]
+            primary_reasons.append(f"Specializes in {', '.join(spec_list)}")
+            matching_attributes.extend(spec_list)
         elif profile.get('specialties'):
-            # Si no hay necesidades específicas, mencionar especialidades generales
+            # If no specific needs, mention general specialties
             specs = profile.get('specialties', [])[:2]
             if specs:
-                primary_reasons.append(f"Especialista en {', '.join(specs)}")
+                primary_reasons.append(f"Specializes in {', '.join(specs)}")
         
-        # Si no hay razones específicas, agregar genéricas
+        # Gender preference if matches
+        if overlapping_attrs.gender_preference and user.stated_preferences.gender_preference:
+            matching_attributes.append("gender_preference")
+        
+        # Language if matches
+        if overlapping_attrs.language and user.stated_preferences.language:
+            matching_attributes.append("language")
+        
+        # Time slots if match
+        if overlapping_attrs.time_slots:
+            matching_attributes.extend([f"time_{slot}" for slot in overlapping_attrs.time_slots[:2]])
+        
+        # If no specific reasons, add generic ones
         if not primary_reasons:
             if availability.get('accepting_new_patients'):
-                primary_reasons.append("Aceptando nuevos pacientes")
+                primary_reasons.append("Accepting new patients")
             if profile.get('years_experience', 0) > 5:
-                primary_reasons.append(f"{profile.get('years_experience')} años de experiencia")
+                primary_reasons.append(f"{profile.get('years_experience')} years of experience")
             if len(profile.get('languages', [])) > 1:
-                primary_reasons.append("Multilingüe")
+                primary_reasons.append("Multilingual")
         
-        # Insights según estrategia
+        # Insights by strategy
         if strategy == "content_based":
-            insights.append("Recomendado por compatibilidad de perfil")
+            insights.append("Recommended based on profile compatibility")
             
         elif strategy == "content_clustering":
             cluster_boost = getattr(components, 'cluster_boost', None)
             if cluster_boost is not None and cluster_boost > 1.1:
-                insights.append("Popular entre usuarios similares a ti")
+                insights.append("Popular among users similar to you")
                 
         elif strategy == "collaborative_ml":
             collaborative_score = getattr(components, 'collaborative_score', None)
             if collaborative_score is not None and collaborative_score > 0.7:
-                insights.append("Alta probabilidad de éxito basada en tu historial")
+                insights.append("High success probability based on your history")
             
             novelty_boost = getattr(components, 'novelty_boost', None)
             if novelty_boost is not None and novelty_boost > 1.2:
-                insights.append("Perfil diferente para ampliar opciones")
+                insights.append("Different profile to expand your options")
         
         # Score breakdown
         score_breakdown = {
-            "Disponibilidad": round(components.availability_match * 100),
-            "Compatibilidad": round(components.specialty_match * 100),
-            "Preferencias": round(components.preference_match * 100)
+            "Availability": round(components.availability_match * 100),
+            "Compatibility": round(components.specialty_match * 100),
+            "Preferences": round(components.preference_match * 100)
         }
         
         collaborative_score = getattr(components, 'collaborative_score', None)
         if collaborative_score is not None:
-            score_breakdown["Predicción ML"] = round(collaborative_score * 100)
+            score_breakdown["ML Prediction"] = round(collaborative_score * 100)
         
         return MatchExplanation(
             primary_reasons=primary_reasons[:3],
@@ -786,6 +896,6 @@ class MatchingEngine:
             filters_applied=self._get_filters_summary(user),
             weights_used={},
             matching_strategy="content_based_anonymous",  # Agregado
-            message="No se encontraron profesionales con los criterios especificados",
-            warnings=["Considera ampliar tus criterios de búsqueda"]
+            message="No clinicians found matching the specified criteria",
+            warnings=["Consider broadening your search criteria"]
         )

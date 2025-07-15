@@ -1,4 +1,3 @@
-# app/models/match.py
 from pydantic import BaseModel, Field
 from typing import List, Dict, Optional, Literal, Any
 from datetime import datetime
@@ -44,6 +43,16 @@ class MatchExplanation(BaseModel):
         description="Nivel de confianza en la recomendación"
     )
 
+class OverlappingAttributes(BaseModel):
+    """Atributos específicos que coinciden entre el usuario y el clínico"""
+    state: bool = Field(..., description="Si el clínico tiene licencia en el estado del usuario")
+    language: bool = Field(..., description="Si el clínico habla el idioma preferido")
+    gender_preference: bool = Field(..., description="Si el género coincide con la preferencia")
+    insurance: bool = Field(..., description="Si el clínico acepta el seguro del usuario")
+    specialties: List[str] = Field(default_factory=list, description="Lista de clinical_needs que coinciden")
+    time_slots: List[str] = Field(default_factory=list, description="Lista de horarios preferidos que coinciden")
+    appointment_type: bool = Field(..., description="Si ofrece el tipo de cita solicitado")
+
 class MatchResult(BaseModel):
     """Resultado de un match individual"""
     # Identificación
@@ -61,6 +70,12 @@ class MatchResult(BaseModel):
     languages: List[str]
     gender: str
     years_experience: int = Field(0, ge=0)
+    
+    # Atributos que coinciden (NUEVO CAMPO)
+    overlapping_attributes: OverlappingAttributes = Field(
+        ..., 
+        description="Atributos específicos que coinciden con las preferencias del usuario"
+    )
     
     # Detalles del match
     score_components: ScoreComponents
@@ -109,6 +124,15 @@ class MatchResponse(BaseModel):
                         "languages": ["English", "Spanish"],
                         "gender": "female",
                         "years_experience": 8,
+                        "overlapping_attributes": {
+                            "state": True,
+                            "language": True,
+                            "gender_preference": True,
+                            "insurance": True,
+                            "specialties": ["anxiety", "depression"],
+                            "time_slots": ["evenings"],
+                            "appointment_type": True
+                        },
                         "score_components": {
                             "availability_match": 1.0,
                             "insurance_match": 1.0,
@@ -120,23 +144,23 @@ class MatchResponse(BaseModel):
                         },
                         "explanation": {
                             "primary_reasons": [
-                                "Disponible inmediatamente",
-                                "Acepta Aetna",
-                                "Especialista en anxiety, depression"
+                                "Available immediately",
+                                "Accepts Aetna",
+                                "Specializes in anxiety, depression"
                             ],
                             "matching_attributes": [
                                 "state", "insurance", "anxiety", 
                                 "depression", "gender_preference"
                             ],
                             "score_breakdown": {
-                                "Disponibilidad": 100,
-                                "Seguro": 100,
-                                "Especialidades": 80,
-                                "Preferencias": 90,
-                                "Demografía": 85
+                                "Availability": 100,
+                                "Insurance": 100,
+                                "Specialties": 80,
+                                "Preferences": 90,
+                                "Demographics": 85
                             },
                             "insights": [
-                                "Popular entre usuarios similares a ti"
+                                "Popular among users similar to you"
                             ],
                             "confidence_level": "high"
                         },

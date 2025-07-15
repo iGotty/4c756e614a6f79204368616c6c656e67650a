@@ -1,4 +1,3 @@
-# app/api/routes/match.py
 from fastapi import APIRouter, HTTPException, Query, Body
 import time
 from typing import List, Dict, Optional, Any
@@ -249,23 +248,23 @@ async def match_complete_user(
 
 @router.get("/clinicians")
 async def get_clinicians(
-    state: Optional[str] = Query(None, description="Filtrar por estado"),
-    appointment_type: Optional[str] = Query(None, description="Filtrar por tipo de cita"),
-    specialty: Optional[str] = Query(None, description="Filtrar por especialidad"),
-    limit: int = Query(20, ge=1, le=100, description="Número de resultados"),
-    offset: int = Query(0, ge=0, description="Offset para paginación")
+    state: Optional[str] = Query(None, description="Filter by state"),
+    appointment_type: Optional[str] = Query(None, description="Filter by appointment type"),
+    specialty: Optional[str] = Query(None, description="Filter by specialty"),
+    limit: int = Query(20, ge=1, le=100, description="Number of results"),
+    offset: int = Query(0, ge=0, description="Offset for pagination")
 ):
     """
-    GET /clinicians - Retorna datos de clínicos según requisitos del challenge.
+    GET /clinicians - Returns clinician data per challenge requirements.
     """
     try:
-        logger.info(f"Solicitud de clínicos - Filtros: state={state}, "
+        logger.info(f"Clinician request - Filters: state={state}, "
                    f"type={appointment_type}, specialty={specialty}")
         
-        # Obtener todos los clínicos
+        # Get all clinicians
         clinicians = list(data_loader.clinicians.values())
         
-        # Aplicar filtros opcionales
+        # Apply optional filters
         if state:
             clinicians = [
                 c for c in clinicians 
@@ -284,11 +283,11 @@ async def get_clinicians(
                 if specialty in c.get('profile_features', {}).get('specialties', [])
             ]
         
-        # Aplicar paginación
+        # Apply pagination
         total = len(clinicians)
         clinicians = clinicians[offset:offset + limit]
         
-        # Formatear respuesta con toda la información
+        # Format response with all information
         formatted_clinicians = []
         for clinician in clinicians:
             formatted_clinicians.append({
@@ -305,7 +304,7 @@ async def get_clinicians(
                 "avg_rating": clinician.get('performance_metrics', {}).get('avg_patient_rating', 0)
             })
         
-        logger.info(f"Retornando {len(formatted_clinicians)} de {total} clínicos")
+        logger.info(f"Returning {len(formatted_clinicians)} of {total} clinicians")
         
         return {
             "total": total,
@@ -315,8 +314,133 @@ async def get_clinicians(
         }
         
     except Exception as e:
-        logger.error(f"Error al obtener clínicos: {str(e)}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Error interno del servidor")
+        logger.error(f"Error getting clinicians: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@router.get("/clinicians/{clinician_id}")
+async def get_clinician_by_id(clinician_id: str):
+    """
+    GET /clinicians/{clinician_id} - Returns detailed information for a specific clinician.
+    """
+    try:
+        logger.info(f"Request for specific clinician: {clinician_id}")
+        
+        # Get clinician from data loader
+        clinician = data_loader.get_clinician(clinician_id)
+        
+        if not clinician:
+            raise HTTPException(
+                status_code=404, 
+                detail=f"Clinician with ID '{clinician_id}' not found"
+            )
+        
+        # Format detailed response
+        basic_info = clinician.get('basic_info', {})
+        profile = clinician.get('profile_features', {})
+        availability = clinician.get('availability_features', {})
+        performance = clinician.get('performance_metrics', {})
+        
+        detailed_response = {
+            "clinician_id": clinician_id,
+            "basic_info": {
+                "full_name": basic_info.get('full_name', 'Unknown'),
+                "license_states": basic_info.get('license_states', []),
+                "appointment_types": basic_info.get('appointment_types', [])
+            },
+            "profile": {
+                "gender": profile.get('gender', 'unknown'),
+                "languages": profile.get('languages', []),
+                "years_experience": profile.get('years_experience', 0),
+                "specialties": profile.get('specialties', []),
+                "certifications": profile.get('certifications', []),
+                "age_groups_served": profile.get('age_groups_served', [])
+            },
+            "availability": {
+                "immediate_availability": availability.get('immediate_availability', False),
+                "accepting_new_patients": availability.get('accepting_new_patients', False),
+                "current_patient_count": availability.get('current_patient_count', 0),
+                "max_patient_capacity": availability.get('max_patient_capacity', 0),
+                "availability_score": availability.get('availability_score', 0.0),
+                "capacity_percentage": round(
+                    (availability.get('current_patient_count', 0) / 
+                     max(availability.get('max_patient_capacity', 1), 1)) * 100, 1
+                )
+            },
+            "performance": {
+                "avg_patient_rating": performance.get('avg_patient_rating', 0.0),
+                "retention_rate": performance.get('retention_rate', 0.0),
+                "success_by_specialty": performance.get('success_by_specialty', {}),
+                "total_patients_helped": availability.get('current_patient_count', 0) * 3  # Estimate
+            },
+            "matching_info": {
+                "popular_for": list(performance.get('success_by_specialty', {}).keys())[:3],
+                "best_suited_for": _get_best_suited_for(clinician),
+                "availability_status": _get_availability_status(availability)
+            }
+        }
+        
+        return detailed_response
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error getting clinician {clinician_id}: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+def _get_best_suited_for(clinician: Dict) -> List[str]:
+    """
+    Determines what type of patients this clinician is best suited for.
+    """
+    suited_for = []
+    profile = clinician.get('profile_features', {})
+    performance = clinician.get('performance_metrics', {})
+    
+    # Based on specialties
+    specialties = profile.get('specialties', [])
+    if 'anxiety' in specialties and 'stress' in specialties:
+        suited_for.append("Stress and anxiety management")
+    if 'trauma' in specialties or 'PTSD' in specialties:
+        suited_for.append("Trauma recovery")
+    if 'couples_therapy' in specialties:
+        suited_for.append("Relationship counseling")
+    if 'depression' in specialties:
+        suited_for.append("Depression treatment")
+    
+    # Based on experience
+    if profile.get('years_experience', 0) > 10:
+        suited_for.append("Complex cases requiring experienced care")
+    elif profile.get('years_experience', 0) < 5:
+        suited_for.append("Patients comfortable with newer therapists")
+    
+    # Based on languages
+    languages = profile.get('languages', [])
+    if len(languages) > 2:
+        suited_for.append("Patients needing multilingual support")
+    
+    return suited_for[:3]  # Return top 3
+
+def _get_availability_status(availability: Dict) -> str:
+    """
+    Returns a human-readable availability status.
+    """
+    if not availability.get('accepting_new_patients', False):
+        return "Not accepting new patients"
+    
+    immediate = availability.get('immediate_availability', False)
+    current = availability.get('current_patient_count', 0)
+    max_capacity = availability.get('max_patient_capacity', 1)
+    capacity_pct = (current / max(max_capacity, 1)) * 100
+    
+    if immediate and capacity_pct < 50:
+        return "Available immediately - Many open slots"
+    elif immediate and capacity_pct < 80:
+        return "Available soon - Some slots open"
+    elif immediate:
+        return "Limited availability - Few slots remaining"
+    elif capacity_pct < 80:
+        return "Accepting new patients - Waitlist possible"
+    else:
+        return "Nearly full - Long waitlist expected"
 
 @router.get("/match/explain")
 async def explain_top_match(
@@ -365,52 +489,52 @@ async def explain_top_match(
         
         if not results.matches:
             return {
-                "explanation": "No se encontraron profesionales disponibles con los criterios especificados.",
-                "suggestion": "Intenta ampliar tus criterios de búsqueda o cambiar el estado."
+                "explanation": "No clinicians found matching your criteria.",
+                "suggestion": "Try broadening your search criteria or changing the state."
             }
         
         top_match = results.matches[0]
         
-        # Generar explicación natural completa
+        # Generate natural complete explanation
         explanation_parts = []
         
         explanation_parts.append(
-            f"Te recomendamos a {top_match.clinician_name} con un "
-            f"{top_match.match_score * 100:.0f}% de compatibilidad."
+            f"We recommend {top_match.clinician_name} with a "
+            f"{top_match.match_score * 100:.0f}% compatibility score."
         )
         
-        # Razones principales
+        # Main reasons
         if top_match.explanation:
             reasons = top_match.explanation.primary_reasons
             if reasons:
                 explanation_parts.append(
-                    f"Las principales razones son: {', '.join(reasons)}."
+                    f"The main reasons are: {', '.join(reasons)}."
                 )
         
-        # Especialidades
+        # Specialties
         if clinical_needs_list and top_match.specialties:
             matching_specs = set(clinical_needs_list) & set(top_match.specialties)
             if matching_specs:
                 explanation_parts.append(
-                    f"Este profesional se especializa en {', '.join(matching_specs)}, "
-                    f"lo cual coincide perfectamente con tus necesidades."
+                    f"This professional specializes in {', '.join(matching_specs)}, "
+                    f"which perfectly matches your needs."
                 )
         
-        # Disponibilidad
+        # Availability
         if urgency_level == "immediate" and top_match.is_available:
             explanation_parts.append(
-                "Está disponible inmediatamente para atender tu caso urgente."
+                "They are available immediately to address your urgent case."
             )
         
-        # Idioma
+        # Language
         if language != "English" and language in top_match.languages:
-            explanation_parts.append(f"Habla {language} con fluidez.")
+            explanation_parts.append(f"Speaks {language} fluently.")
         
-        # Experiencia
+        # Experience
         if top_match.years_experience > 10:
             explanation_parts.append(
-                f"Cuenta con {top_match.years_experience} años de experiencia "
-                f"ayudando a personas con situaciones similares."
+                f"Has {top_match.years_experience} years of experience "
+                f"helping people with similar situations."
             )
         
         # Insights adicionales si están disponibles
@@ -434,6 +558,172 @@ async def explain_top_match(
         
     except Exception as e:
         logger.error(f"Error al generar explicación: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Error interno del servidor")
+
+@router.get("/match/explain/all")
+async def explain_all_matches(
+    state: str = Query(..., description="Estado del usuario"),
+    language: str = Query("English"),
+    gender_preference: Optional[str] = Query(None),
+    insurance_provider: Optional[str] = Query(None),
+    appointment_type: str = Query("therapy"),
+    clinical_needs: Optional[str] = Query(None, description="Necesidades clínicas separadas por comas"),
+    preferred_time_slots: Optional[str] = Query(None, description="Horarios preferidos separados por comas"),
+    urgency_level: str = Query("flexible"),
+    limit: int = Query(10, ge=1, le=50, description="Número de resultados a explicar")
+):
+    """
+    GET /match/explain/all - Retorna explicaciones en lenguaje natural para TODOS los matches.
+    Similar a /match/explain pero para múltiples resultados.
+    """
+    try:
+        # Parsear listas desde strings
+        clinical_needs_list = clinical_needs.split(",") if clinical_needs else []
+        preferred_time_slots_list = preferred_time_slots.split(",") if preferred_time_slots else []
+        
+        # Validación para medication
+        if appointment_type == "medication":
+            clinical_needs_list = []
+            
+        # Crear preferencias
+        preferences = StatedPreferences(
+            state=state,
+            language=language,
+            gender_preference=gender_preference,
+            insurance_provider=insurance_provider,
+            appointment_type=appointment_type,
+            clinical_needs=clinical_needs_list,
+            preferred_time_slots=preferred_time_slots_list,
+            urgency_level=urgency_level
+        )
+        
+        # Crear usuario
+        user = User(
+            registration_type="anonymous",
+            stated_preferences=preferences
+        )
+        
+        # Obtener matches con el límite especificado
+        results = matching_engine.match(user=user, limit=limit, include_explanations=True)
+        
+        if not results.matches:
+            return {
+                "total_matches": 0,
+                "explanations": [],
+                "message": "No clinicians found matching your criteria.",
+                "suggestion": "Try broadening your search criteria or changing the state."
+            }
+        
+        # Generar explicaciones para cada match
+        explanations = []
+        
+        for idx, match in enumerate(results.matches, 1):
+            # Generar explicación natural para cada match
+            explanation_parts = []
+            
+            # Introduction with ranking
+            explanation_parts.append(
+                f"#{idx}. {match.clinician_name} - {match.match_score * 100:.0f}% compatibility"
+            )
+            
+            # Main reasons
+            if match.explanation and match.explanation.primary_reasons:
+                reasons = match.explanation.primary_reasons
+                explanation_parts.append(
+                    f"Reasons: {', '.join(reasons)}"
+                )
+            
+            # Matching attributes
+            overlapping = match.overlapping_attributes
+            matching_details = []
+            
+            if overlapping.state:
+                matching_details.append(f"✓ Licensed in {state}")
+                
+            if overlapping.insurance and insurance_provider:
+                matching_details.append(f"✓ Accepts {insurance_provider}")
+            elif overlapping.insurance and not insurance_provider:
+                matching_details.append("✓ Accepts patients without insurance")
+                
+            if overlapping.language and language != "English":
+                matching_details.append(f"✓ Speaks {language}")
+                
+            if overlapping.gender_preference and gender_preference:
+                matching_details.append(f"✓ Gender: {match.gender}")
+                
+            if overlapping.specialties:
+                matching_details.append(f"✓ Specialties: {', '.join(overlapping.specialties)}")
+                
+            if overlapping.time_slots:
+                matching_details.append(f"✓ Available: {', '.join(overlapping.time_slots)}")
+            
+            # Additional information
+            additional_info = []
+            
+            if match.years_experience > 10:
+                additional_info.append(f"{match.years_experience} years of experience")
+                
+            if match.is_available and urgency_level == "immediate":
+                additional_info.append("Available immediately")
+            elif match.is_available:
+                additional_info.append("Available for appointments")
+                
+            if len(match.languages) > 2:
+                additional_info.append(f"Multilingual ({len(match.languages)} languages)")
+            
+            # Insights si están disponibles
+            insights = []
+            if match.explanation and match.explanation.insights:
+                insights = match.explanation.insights
+            
+            # Construir objeto de explicación
+            explanation_obj = {
+                "rank": idx,
+                "clinician_id": match.clinician_id,
+                "clinician_name": match.clinician_name,
+                "match_score": match.match_score,
+                "summary": " | ".join(explanation_parts),
+                "matching_details": matching_details,
+                "additional_info": additional_info,
+                "insights": insights,
+                "confidence_level": match.explanation.confidence_level if match.explanation else "medium",
+                "overlapping_attributes": {
+                    "state": overlapping.state,
+                    "language": overlapping.language,
+                    "gender_preference": overlapping.gender_preference,
+                    "insurance": overlapping.insurance,
+                    "specialties": overlapping.specialties,
+                    "time_slots": overlapping.time_slots,
+                    "appointment_type": overlapping.appointment_type
+                }
+            }
+            
+            explanations.append(explanation_obj)
+        
+        # Resumen general
+        avg_score = sum(m.match_score for m in results.matches) / len(results.matches)
+        high_confidence_count = sum(
+            1 for e in explanations 
+            if e["confidence_level"] in ["high", "very_high"]
+        )
+        
+        return {
+            "total_matches": len(results.matches),
+            "average_match_score": round(avg_score, 3),
+            "high_confidence_matches": high_confidence_count,
+            "search_criteria": {
+                "state": state,
+                "appointment_type": appointment_type,
+                "language": language,
+                "clinical_needs": clinical_needs_list,
+                "urgency": urgency_level
+            },
+            "explanations": explanations,
+            "processing_time_ms": results.processing_time_ms
+        }
+        
+    except Exception as e:
+        logger.error(f"Error al generar explicaciones múltiples: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail="Error interno del servidor")
 
 @router.get("/match/stats")
@@ -491,9 +781,9 @@ async def get_matching_stats():
             "top_specialties": dict(top_specialties),
             "top_states": dict(top_states),
             "matching_strategies": {
-                "anonymous": "Content-based filtering (Top 5 genéricos)",
-                "basic": "Content-based + Clustering (Personalización demográfica)",
-                "complete": "Collaborative Filtering + ML (Predicción basada en historial)"
+                "anonymous": "Content-based filtering (Top 5 generic matches)",
+                "basic": "Content-based + Clustering (Demographic personalization)",
+                "complete": "Collaborative Filtering + ML (History-based prediction)"
             },
             "ml_features": {
                 "clustering_enabled": True,
@@ -608,43 +898,43 @@ def _generate_natural_explanation(
     
     explanation_parts = []
     
-    # Introducción
+    # Introduction
     explanation_parts.append(
-        f"{basic_info.get('full_name', 'Este profesional')} tiene un "
-        f"{score_pct:.0f}% de compatibilidad con tus preferencias."
+        f"{basic_info.get('full_name', 'This professional')} has a "
+        f"{score_pct:.0f}% compatibility with your preferences."
     )
     
-    # Razones principales
+    # Main reasons
     reasons = []
     
     if components.availability_match > 0.8:
-        reasons.append("está disponible inmediatamente")
+        reasons.append("is available immediately")
     
     if components.insurance_match == 1.0 and user.has_insurance():
-        reasons.append(f"acepta tu seguro {user.stated_preferences.insurance_provider}")
+        reasons.append(f"accepts your {user.stated_preferences.insurance_provider} insurance")
     
     if components.specialty_match > 0.7:
         matching_specs = set(user.stated_preferences.clinical_needs) & set(profile.get('specialties', []))
         if matching_specs:
-            reasons.append(f"es especialista en {', '.join(list(matching_specs)[:2])}")
+            reasons.append(f"specializes in {', '.join(list(matching_specs)[:2])}")
     
     if reasons:
         explanation_parts.append(
-            f"Este profesional {', '.join(reasons[:-1])} y {reasons[-1]}." 
-            if len(reasons) > 1 else f"Este profesional {reasons[0]}."
+            f"This professional {', '.join(reasons[:-1])} and {reasons[-1]}." 
+            if len(reasons) > 1 else f"This professional {reasons[0]}."
         )
     
-    # Información adicional
+    # Additional information
     years_exp = profile.get('years_experience', 0)
     if years_exp > 10:
-        explanation_parts.append(f"Cuenta con {years_exp} años de experiencia.")
+        explanation_parts.append(f"Has {years_exp} years of experience.")
     
     languages = profile.get('languages', [])
     if len(languages) > 1:
-        explanation_parts.append(f"Habla {', '.join(languages)}.")
+        explanation_parts.append(f"Speaks {', '.join(languages)}.")
     
     rating = clinician.get('performance_metrics', {}).get('avg_patient_rating', 0)
     if rating >= 4.5:
-        explanation_parts.append(f"Tiene una calificación excepcional de {rating:.1f}/5.0.")
+        explanation_parts.append(f"Has an exceptional rating of {rating:.1f}/5.0.")
     
     return " ".join(explanation_parts)
