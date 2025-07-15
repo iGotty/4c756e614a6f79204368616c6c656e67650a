@@ -52,7 +52,15 @@ jobs:
       run: |
         cd backend
         python -m pip install --upgrade pip
-        pip install -r requirements.txt
+        # Usar requirements-prod.txt si existe, sino requirements.txt
+        if [ -f requirements-prod.txt ]; then
+          echo "📦 Installing from requirements-prod.txt"
+          pip install -r requirements-prod.txt
+        else
+          echo "📦 Installing from requirements.txt (removing Windows-only packages)"
+          grep -v "pywin32" requirements.txt > requirements-temp.txt
+          pip install -r requirements-temp.txt
+        fi
         cd ..
         
     # Create startup.txt if it doesn't exist
@@ -66,6 +74,20 @@ jobs:
     - name: Create deployment package
       run: |
         cd backend
+        
+        # Ensure data directory is included
+        if [ ! -d "data" ] && [ -d "../data" ]; then
+          echo "📁 Copying data directory from parent"
+          cp -r ../data .
+        fi
+        
+        # List contents to verify
+        echo "📋 Backend directory contents:"
+        ls -la
+        if [ -d "data" ]; then
+          echo "📋 Data directory contents:"
+          ls -la data/
+        fi
         
         # Create deployment package including all files
         zip -r ../deploy.zip . \
